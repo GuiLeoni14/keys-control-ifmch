@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Zap, BookOpen } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Zap, BookOpen, Loader, CheckCircle, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
 const labs = [
   { id: 1, name: 'Lab. Informática', floor: '2º Andar', icon: '💻', color: 'from-blue-600 to-blue-700' },
@@ -13,10 +14,45 @@ const labs = [
 
 export default function Withdrawal() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [loadingLabId, setLoadingLabId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; labName: string } | null>(null);
 
-  const handleWithdrawal = (labName: string) => {
-    alert(`✅ Solicitação enviada para: ${labName}\n\nAguardando liberação do Arduino...`);
-    router.push('/dashboard');
+  const showToast = (type: 'success' | 'error', message: string, labName: string) => {
+    setToast({ type, message, labName });
+    
+    if (type === 'success') {
+      setTimeout(() => router.push('/dashboard'), 2500);
+    } else {
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
+
+  const handleWithdrawal = async (lab: typeof labs[0]) => {
+    setLoading(true);
+    setLoadingLabId(lab.id);
+
+    try {
+      const response = await fetch('/api/withdrawal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ labName: lab.name }),
+      });
+
+      if (!response.ok) {
+        showToast('error', 'Erro ao solicitar liberação', lab.name);
+        return;
+      }
+
+      showToast('success', 'Aguardando liberação do Arduino...', lab.name);
+    } catch (error) {
+      showToast('error', 'Erro de conexão', lab.name);
+    } finally {
+      setLoading(false);
+      setLoadingLabId(null);
+    }
   };
 
   return (
@@ -26,7 +62,8 @@ export default function Withdrawal() {
         <div className="max-w-2xl mx-auto flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition transform hover:scale-110 active:scale-95"
+            disabled={loading}
+            className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft size={20} />
           </button>
@@ -54,26 +91,73 @@ export default function Withdrawal() {
           {labs.map((lab, idx) => (
             <button
               key={lab.id}
-              onClick={() => handleWithdrawal(lab.name)}
-              className="w-full group relative overflow-hidden rounded-2xl animate-fadeInUp transform hover:scale-105 active:scale-95 transition-all duration-300"
+              onClick={() => handleWithdrawal(lab)}
+              disabled={loading}
+              className="w-full group relative overflow-hidden rounded-2xl animate-fadeInUp transform hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{animationDelay: `${(idx + 1) * 0.08}s`}}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${lab.color} opacity-20 group-hover:opacity-30 transition`}></div>
               <div className={`relative bg-gradient-to-br from-slate-800 to-slate-900 border-2 ${lab.color === 'from-blue-600 to-blue-700' ? 'border-blue-600 group-hover:border-blue-500' : lab.color === 'from-yellow-600 to-yellow-700' ? 'border-yellow-600 group-hover:border-yellow-500' : lab.color === 'from-purple-600 to-purple-700' ? 'border-purple-600 group-hover:border-purple-500' : lab.color === 'from-green-600 to-emerald-700' ? 'border-green-600 group-hover:border-green-500' : 'border-orange-600 group-hover:border-orange-500'} transition p-5 flex items-center gap-4`}>
-                <div className="text-4xl">{lab.icon}</div>
+                <div className="text-4xl">
+                  {loadingLabId === lab.id ? (
+                    <Loader size={40} className="animate-spin text-green-400" />
+                  ) : (
+                    lab.icon
+                  )}
+                </div>
                 <div className="flex-1 text-left">
-                  <h3 className="font-bold text-white group-hover:text-gray-100 transition">{lab.name}</h3>
+                  <h3 className="font-bold text-white group-hover:text-gray-100 transition">
+                    {loadingLabId === lab.id ? 'Processando...' : lab.name}
+                  </h3>
                   <p className="text-gray-400 text-sm flex items-center gap-1">
                     <BookOpen size={14} />
                     {lab.floor}
                   </p>
                 </div>
-                <div className="text-2xl group-hover:translate-x-2 transition transform">→</div>
+                <div className={`text-2xl transition transform ${loadingLabId === lab.id ? 'opacity-0' : 'group-hover:translate-x-2'}`}>
+                  →
+                </div>
               </div>
             </button>
           ))}
         </div>
       </div>
+
+      {/* Toast Notifications */}
+      {toast && (
+        <div className={`fixed top-6 left-6 right-6 max-w-md mx-auto rounded-2xl p-4 flex items-center gap-3 animate-slideInDown z-50 shadow-2xl ${
+          toast.type === 'success' 
+            ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 border border-emerald-500' 
+            : 'bg-gradient-to-r from-red-600 to-red-700 border border-red-500'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle size={24} className="text-white flex-shrink-0" />
+          ) : (
+            <XCircle size={24} className="text-white flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold truncate">{toast.message}</p>
+            <p className="text-white/80 text-sm truncate">{toast.labName}</p>
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-white/60 hover:text-white transition text-lg flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Loading Overlay (Mobile-friendly) */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-40">
+          <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-4 mx-6 max-w-sm">
+            <Loader size={48} className="animate-spin text-green-400" />
+            <p className="text-white font-semibold text-center">Solicitando liberação...</p>
+            <p className="text-gray-400 text-sm text-center">Aguarde a confirmação do Arduino</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

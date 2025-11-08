@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { RootProviders } from "./providers";
 
 export const metadata: Metadata = {
   title: "Controle de Chaves - Campus Machado",
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <RootProviders>
+          {children}
+        </RootProviders>
+      </body>
     </html>
   );
 }
